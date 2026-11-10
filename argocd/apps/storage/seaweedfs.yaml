@@ -1,0 +1,36 @@
+# SeaweedFS all-in-one with the S3 gateway. Stores model files in bucket "models".
+# Source 1 is the Helm chart. Source 2 is this repo, used only for the values file.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: seaweedfs
+  namespace: argocd
+spec:
+  project: default
+  sources:
+    - repoURL: https://seaweedfs.github.io/seaweedfs/helm
+      chart: seaweedfs
+      targetRevision: 4.53.0
+      helm:
+        releaseName: seaweedfs
+        valueFiles:
+          - $values/platform/values/seaweedfs.yaml
+    - repoURL: https://github.com/zessam/ai-inference-platform.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: storage
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

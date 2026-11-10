@@ -1,0 +1,23 @@
+# Stack Application "inference". Syncs the Applications in argocd/apps/inference.
+# Sync wave 2. The Application health check in patches/argocd-app-health.yaml
+# makes the root app wait until this stack is Healthy before the next wave.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: inference
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/zessam/ai-inference-platform.git
+    targetRevision: main
+    path: argocd/apps/inference
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
