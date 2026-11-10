@@ -1,0 +1,53 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: inference-lab
+networking:
+  apiServerAddress: "127.0.0.1"
+  apiServerPort: 6443
+nodes:
+- role: control-plane
+  extraPortMappings:
+  - {containerPort: 30080, hostPort: 8080, listenAddress: "127.0.0.1"}  # Portkey
+  - {containerPort: 30081, hostPort: 8081, listenAddress: "127.0.0.1"}  # llm-d gateway
+  - {containerPort: 30082, hostPort: 8082, listenAddress: "127.0.0.1"}  # Guardrails API
+  - {containerPort: 30030, hostPort: 3000, listenAddress: "127.0.0.1"}  # Grafana
+  - {containerPort: 30090, hostPort: 9090, listenAddress: "127.0.0.1"}  # Prometheus
+  - {containerPort: 30300, hostPort: 3300, listenAddress: "127.0.0.1"}  # Langfuse
+  - {containerPort: 30700, hostPort: 7007, listenAddress: "127.0.0.1"}  # Backstage
+  - {containerPort: 30085, hostPort: 8085, listenAddress: "127.0.0.1"}  # Argo CD UI
+
+- role: worker
+  labels:
+    pool: management
+
+- role: worker
+  labels:
+    pool: inference
+    accelerator: cpu
+  kubeadmConfigPatches:
+  - |
+    kind: JoinConfiguration
+    nodeRegistration:
+      taints:
+      - key: workload
+        value: inference
+        effect: NoSchedule
+  extraMounts:
+  - hostPath: C:/models
+    containerPath: /models
+
+- role: worker
+  labels:
+    pool: inference
+    accelerator: cpu
+  kubeadmConfigPatches:
+  - |
+    kind: JoinConfiguration
+    nodeRegistration:
+      taints:
+      - key: workload
+        value: inference
+        effect: NoSchedule
+  extraMounts:
+  - hostPath: C:/models
+    containerPath: /models
