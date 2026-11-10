@@ -1,0 +1,7 @@
+# Patch for each Argo CD Deployment and StatefulSet. Runs the pods on the
+# management node (inference-lab-worker, label pool=management).
+spec:
+  template:
+    spec:
+      nodeSelector:
+        pool: management
