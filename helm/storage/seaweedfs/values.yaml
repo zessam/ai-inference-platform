@@ -1,0 +1,53 @@
+# Values for the seaweedfs Helm chart 4.53.0 (argocd/apps/storage/seaweedfs.yaml).
+# One all-in-one pod (master, volume, filer, S3) on the storage node.
+# This chart takes nodeSelector and tolerations as multi-line strings, not maps.
+
+master:
+  enabled: false
+volume:
+  enabled: false
+filer:
+  enabled: false
+
+allInOne:
+  enabled: true
+  replicas: 1
+  updateStrategy:
+    type: Recreate
+  s3:
+    enabled: true
+    enableAuth: true
+    createBuckets:
+      - name: models
+  service:
+    type: NodePort
+    nodePorts:
+      s3: 30333            # kind maps host 127.0.0.1:8333 to this port
+  data:
+    type: hostPath
+    hostPathPrefix: /data  # /data on worker4 is C:\kind-storage\seaweedfs on the host
+  affinity: ""             # remove the chart default pod anti-affinity
+  nodeSelector: |
+    pool: storage
+  tolerations: |
+    - key: workload
+      operator: Equal
+      value: storage
+      effect: NoSchedule
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+# Both identities use existingSecret because Argo CD can't run Helm lookup,
+# so chart-generated keys would change on every sync.
+# scripts/argocd-deployment.sh creates storage/seaweedfs-s3-creds from .lab-secrets.json.
+s3:
+  credentials:
+    admin:
+      existingSecret: seaweedfs-s3-creds
+    read:
+      existingSecret: seaweedfs-s3-creds

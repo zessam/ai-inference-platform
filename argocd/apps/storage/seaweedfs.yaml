@@ -14,7 +14,7 @@ spec:
       helm:
         releaseName: seaweedfs
         valueFiles:
-          - $values/platform/values/seaweedfs.yaml
+          - $values/helm/storage/seaweedfs/values.yaml
     - repoURL: https://github.com/zessam/ai-inference-platform.git
       targetRevision: main
       ref: values
