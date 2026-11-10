@@ -8,19 +8,20 @@ nodes:
 - role: control-plane
   extraPortMappings:
   - {containerPort: 30080, hostPort: 8080, listenAddress: "127.0.0.1"}  # Portkey
-  - {containerPort: 30081, hostPort: 8081, listenAddress: "127.0.0.1"}  # llm-d gateway
+  - {containerPort: 30081, hostPort: 8081, listenAddress: "127.0.0.1"}  # llm-d / KServe gateway
   - {containerPort: 30082, hostPort: 8082, listenAddress: "127.0.0.1"}  # Guardrails API
   - {containerPort: 30030, hostPort: 3000, listenAddress: "127.0.0.1"}  # Grafana
   - {containerPort: 30090, hostPort: 9090, listenAddress: "127.0.0.1"}  # Prometheus
   - {containerPort: 30300, hostPort: 3300, listenAddress: "127.0.0.1"}  # Langfuse
   - {containerPort: 30700, hostPort: 7007, listenAddress: "127.0.0.1"}  # Backstage
   - {containerPort: 30085, hostPort: 8085, listenAddress: "127.0.0.1"}  # Argo CD UI
+  - {containerPort: 30333, hostPort: 8333, listenAddress: "127.0.0.1"}  # SeaweedFS S3 API
 
-- role: worker
+- role: worker            # inference-lab-worker
   labels:
     pool: management
 
-- role: worker
+- role: worker            # inference-lab-worker2
   labels:
     pool: inference
     accelerator: cpu
@@ -29,14 +30,9 @@ nodes:
     kind: JoinConfiguration
     nodeRegistration:
       taints:
-      - key: workload
-        value: inference
-        effect: NoSchedule
-  extraMounts:
-  - hostPath: C:/models
-    containerPath: /models
+      - {key: workload, value: inference, effect: NoSchedule}
 
-- role: worker
+- role: worker            # inference-lab-worker3
   labels:
     pool: inference
     accelerator: cpu
@@ -45,9 +41,17 @@ nodes:
     kind: JoinConfiguration
     nodeRegistration:
       taints:
-      - key: workload
-        value: inference
-        effect: NoSchedule
+      - {key: workload, value: inference, effect: NoSchedule}
+
+- role: worker            # inference-lab-worker4
+  labels:
+    pool: storage
+  kubeadmConfigPatches:
+  - |
+    kind: JoinConfiguration
+    nodeRegistration:
+      taints:
+      - {key: workload, value: storage, effect: NoSchedule}
   extraMounts:
-  - hostPath: C:/models
-    containerPath: /models
+  - hostPath: C:/kind-storage/seaweedfs
+    containerPath: /data
