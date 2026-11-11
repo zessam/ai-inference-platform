@@ -1,0 +1,23 @@
+{{- if .Values.metrics.enabled }}
+# Prometheus scrapes the vLLM metrics (vllm:num_requests_waiting,
+# vllm:kv_cache_usage_perc, ...) from each vLLM pod of this model. KEDA reads
+# them from Prometheus to scale the model.
+# kube-prometheus-stack selects PodMonitors from all releases
+# (podMonitorSelectorNilUsesHelmValues: false), so no extra label is needed.
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ .Values.name }}-vllm
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ .Values.name }}
+      app.kubernetes.io/component: llminferenceservice-workload
+  podMetricsEndpoints:
+    # The KServe preset declares containerPort 8000 without a name.
+    # vLLM serves plain HTTP (enableLLMInferenceServiceTLS is not set).
+    - portNumber: 8000
+      path: /metrics
+      scheme: http
+      interval: {{ .Values.metrics.interval }}
+{{- end }}

@@ -160,10 +160,11 @@ Later: KEDA 2.21.0 for autoscaling, Guardrails AI on node port 30082.
 | --- | --- | --- | --- | --- | --- | --- |
 | vllm | This repository | helm/inference/vllm | 0.1.0 | inference | 0 in the inference stack | LLMInferenceService `smollm2`, 1 replica, vLLM CPU image |
 
-The Application is `argocd/apps/inference/vllm.yaml`. The chart `helm/inference/vllm` renders two objects:
+The Application is `argocd/apps/inference/vllm.yaml`. The chart `helm/inference/vllm` renders three objects:
 
 - The LLMInferenceService `inference/smollm2` (`serving.kserve.io/v1alpha2`).
 - The ServiceAccount `inference/kserve-s3`, which lists the Secret `s3-models`.
+- The PodMonitor `inference/smollm2-vllm`. Prometheus scrapes `/metrics` on port 8000 of each vLLM pod every 15 seconds. KEDA reads these metrics from Prometheus.
 
 The LLMInferenceService has these settings:
 

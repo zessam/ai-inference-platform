@@ -43,3 +43,8 @@ tolerations:
 serviceAccount:
   name: kserve-s3
   s3Secret: s3-models
+
+# PodMonitor for the vLLM metrics (templates/podmonitor.yaml).
+metrics:
+  enabled: true
+  interval: 15s
