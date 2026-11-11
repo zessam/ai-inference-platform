@@ -92,4 +92,4 @@ With one replica, the endpoint picker has only one choice. When two or more repl
 
 KEDA is not installed. So, if the queue grows, the number of vLLM replicas does not change. KEDA will read the metric `vllm:num_requests_waiting` from Prometheus. When requests wait in the queue, KEDA will add replicas. Then the new pod downloads the model, joins the InferencePool, and gets traffic from the endpoint picker.
 
-The vLLM model is not deployed yet. `docs/PLAN.md` describes the planned LLMInferenceService in the inference stack.
+The vLLM model `inference/smollm2` is defined in `helm/inference/vllm`. The section "Inference stack" in `docs/PLAN.md` describes it.

@@ -28,6 +28,7 @@ A group folder holds apps that belong together. It has the same name in `argocd/
 | management/kserve | kserve-runtime-configs | ghcr.io/kserve/charts (OCI) | kserve-runtime-configs | v0.21.0 | No pods |
 | management/kserve | kserve-gateway | This repository | helm/management/kserve/kserve-gateway | 0.1.0 | management |
 | management | portkey | This repository | helm/management/portkey | 0.1.0 | management |
+| inference | vllm | This repository | helm/inference/vllm | 0.1.0 | inference |
 
 The CRD charts `envoy-ai-gateway-crds` and `kserve-llmisvc-crd` have no values file, so they have no folder here.
 
@@ -88,4 +89,4 @@ If the chart is in this repository, the Application needs only one source. Set `
     path: helm/inference/vllm
 ```
 
-`helm/management/kserve/kserve-gateway` is an example. The vLLM chart in `helm/inference/vllm` is planned. `docs/PLAN.md` gives its settings.
+`helm/management/kserve/kserve-gateway` and `helm/inference/vllm` are examples.

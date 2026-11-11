@@ -1,0 +1,40 @@
+# The container named "main" is merged with the preset kserve-config-llm-template.
+# The preset supplies the vllm serve command, the ports and the probes. These
+# fields replace the GPU image and settings of the preset with CPU ones.
+apiVersion: serving.kserve.io/v1alpha2
+kind: LLMInferenceService
+metadata:
+  name: {{ .Values.name }}
+spec:
+  model:
+    uri: {{ .Values.model.uri }}
+    name: {{ .Values.model.name }}
+  replicas: {{ .Values.replicas }}
+  router:
+    # Defaults: llm-d scheduler, HTTPRoute on kserve/kserve-ingress-gateway.
+    scheduler: {}
+    route: {}
+    gateway: {}
+  template:
+    serviceAccountName: {{ .Values.serviceAccount.name }}
+    nodeSelector:
+      {{- toYaml .Values.nodeSelector | nindent 6 }}
+    tolerations:
+      {{- toYaml .Values.tolerations | nindent 6 }}
+    containers:
+      - name: main
+        image: {{ .Values.image }}
+        # The vLLM CPU image runs as root.
+        securityContext:
+          runAsNonRoot: false
+        env:
+          - name: VLLM_CPU_KVCACHE_SPACE
+            value: {{ .Values.kvCacheSpaceGiB | quote }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        # vLLM on CPU starts slowly. Values from the KServe CPU sample.
+        livenessProbe:
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 30
+          failureThreshold: 5

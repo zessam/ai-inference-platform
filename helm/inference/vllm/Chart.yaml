@@ -1,0 +1,5 @@
+apiVersion: v2
+name: vllm
+description: vLLM model server as a KServe LLMInferenceService
+type: application
+version: 0.1.0

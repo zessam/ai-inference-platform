@@ -143,6 +143,28 @@ kubectl -n monitoring create secret generic grafana-admin \
   --from-literal=admin-password="$GRAFANA_ADMIN_PASSWORD" \
   --dry-run=client -o yaml | kubectl apply -f -
 
+echo "==> Creating namespace inference and Secret inference/s3-models"
+# Read keys for the vLLM model download. ServiceAccount inference/kserve-s3
+# (helm/inference/vllm) lists this Secret. The KServe storage-initializer reads
+# the keys and the annotations.
+kubectl create namespace inference --dry-run=client -o yaml | kubectl apply -f -
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: s3-models
+  namespace: inference
+  annotations:
+    serving.kserve.io/s3-endpoint: seaweedfs-all-in-one.storage.svc:8333
+    serving.kserve.io/s3-usehttps: "0"
+    serving.kserve.io/s3-verifyssl: "0"
+    serving.kserve.io/s3-region: us-east-1
+type: Opaque
+stringData:
+  AWS_ACCESS_KEY_ID: "$READ_ACCESS_KEY"
+  AWS_SECRET_ACCESS_KEY: "$READ_SECRET_KEY"
+EOF
+
 # --- App of apps -------------------------------------------------------------
 echo "==> Applying $ROOT_APP"
 kubectl apply -f "$ROOT_APP"

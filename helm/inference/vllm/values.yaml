@@ -1,0 +1,45 @@
+# Values for the local vllm chart (argocd/apps/inference/vllm.yaml).
+# One LLMInferenceService (KServe v0.21.0, serving.kserve.io/v1alpha2).
+
+# Name of the LLMInferenceService. The gateway serves the model at
+# /<namespace>/<name>/v1/... on kserve-ingress-gateway.
+name: smollm2
+
+model:
+  # Downloaded by the KServe storage-initializer from SeaweedFS.
+  uri: s3://models/smollm2-135m-instruct
+  # Value of --served-model-name. Clients send it in the "model" field.
+  name: smollm2-135m-instruct
+
+# One replica on one inference node for now.
+replicas: 1
+
+# vLLM CPU build, pinned by tag and digest. This is the CPU image that the
+# KServe v0.21.0 presets use. Replace it with a GPU image for GPU nodes.
+image: docker.io/vllm/vllm-openai-cpu:v0.23.0@sha256:89e1fbe829038b1a560601990c8ec89625c622a969fcbc8f10ce48b6139795be
+
+# GiB of memory for the vLLM KV cache on CPU.
+kvCacheSpaceGiB: "1"
+
+resources:
+  requests:
+    cpu: "1"
+    memory: 4Gi
+  limits:
+    cpu: "2"
+    memory: 8Gi
+
+nodeSelector:
+  pool: inference
+
+tolerations:
+  - key: workload
+    operator: Equal
+    value: inference
+    effect: NoSchedule
+
+# ServiceAccount for the model download. It lists the Secret s3-models, which
+# scripts/argocd-deployment.sh creates outside Git with the SeaweedFS read keys.
+serviceAccount:
+  name: kserve-s3
+  s3Secret: s3-models

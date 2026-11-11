@@ -1,6 +1,9 @@
-# Merge patch for ConfigMap argocd-cm. Adds a health check for Application
-# resources, so a parent app (root) waits for each stack to be Healthy before
-# the next sync wave. Status is Progressing until the child reports health.
+# Merge patch for ConfigMap argocd-cm. Adds health checks:
+# - argoproj.io/Application: a parent app (root, stacks, groups) waits for each
+#   child app to be Healthy before the next sync wave. Status is Progressing
+#   until the child reports health.
+# - serving.kserve.io/LLMInferenceService: Healthy only when the Ready
+#   condition is True, so the vllm app is not Healthy while vLLM still loads.
 data:
   resource.customizations.health.argoproj.io_Application: |
     hs = {}
@@ -10,6 +13,25 @@ data:
       hs.status = obj.status.health.status
       if obj.status.health.message ~= nil then
         hs.message = obj.status.health.message
+      end
+    end
+    return hs
+  resource.customizations.health.serving.kserve.io_LLMInferenceService: |
+    hs = {}
+    hs.status = "Progressing"
+    hs.message = "Waiting for the Ready condition"
+    if obj.status ~= nil and obj.status.conditions ~= nil then
+      for _, c in ipairs(obj.status.conditions) do
+        if c.type == "Ready" then
+          if c.status == "True" then
+            hs.status = "Healthy"
+            hs.message = "Ready"
+          elseif c.message ~= nil then
+            hs.message = c.message
+          elseif c.reason ~= nil then
+            hs.message = c.reason
+          end
+        end
       end
     end
     return hs

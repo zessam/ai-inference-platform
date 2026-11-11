@@ -1,6 +1,6 @@
 # Argo CD platform plan
 
-This file lists the Argo CD Applications for each stack. A stack is a group of apps that Argo CD syncs together. All four stack Applications exist. The storage, monitoring and management stacks have apps now. The inference folder contains only a `.gitkeep` file.
+This file lists the Argo CD Applications for each stack. A stack is a group of apps that Argo CD syncs together. All four stack Applications exist. All four stacks have apps now.
 
 ## Layout
 
@@ -24,7 +24,7 @@ A sync wave is a number on an Application. Argo CD syncs lower numbers first. Th
 | storage | 0 | Created: seaweedfs |
 | monitoring | 0 | Created: kube-prometheus-stack |
 | management | 1 | Created: KServe group (cert-manager, LeaderWorkerSet, Envoy Gateway, Envoy AI Gateway, KServe LLMInferenceService), Portkey |
-| inference | 2 | Planned |
+| inference | 2 | Created: vllm |
 
 The sync wave of an app applies only inside its stack. For example, kserve-llmisvc-resources has wave 2 in the management stack. It starts after the other management apps, not at the same time as the inference stack.
 
@@ -129,10 +129,10 @@ Portkey sends a request to the upstream that the client names in two headers. Fo
 
 ```
 x-portkey-provider: openai
-x-portkey-custom-host: http://kserve-ingress-gateway.envoy-gateway-system.svc.cluster.local/<route path of the model>/v1
+x-portkey-custom-host: http://kserve-ingress-gateway.envoy-gateway-system.svc.cluster.local/inference/smollm2/v1
 ```
 
-`kserve-ingress-gateway.envoy-gateway-system.svc` is the Envoy proxy Service of the KServe gateway. The EnvoyProxy in `helm/management/kserve/kserve-gateway` gives it this fixed name. The route path of the model is known after the vLLM LLMInferenceService exists.
+`kserve-ingress-gateway.envoy-gateway-system.svc` is the Envoy proxy Service of the KServe gateway. The EnvoyProxy in `helm/management/kserve/kserve-gateway` gives it this fixed name. `/inference/smollm2` is the route path of the vLLM model (`/<namespace>/<name>`).
 
 ### Analytics with ClickHouse (not ready)
 
@@ -154,38 +154,52 @@ To move to ClickHouse analytics later, do these steps:
 
 Later: KEDA 2.21.0 for autoscaling, Guardrails AI on node port 30082.
 
-## Inference stack (planned)
+## Inference stack (created)
 
 | App | Chart repository | Chart | Version | Namespace | Sync wave | Key values |
 | --- | --- | --- | --- | --- | --- | --- |
-| vllm | This repository | helm/inference/vllm | Pinned in Chart.yaml | inference | Stack wave 2 | KServe LLMInferenceService, see the list below |
+| vllm | This repository | helm/inference/vllm | 0.1.0 | inference | 0 in the inference stack | LLMInferenceService `smollm2`, 1 replica, vLLM CPU image |
 
-The chart `helm/inference/vllm` does not exist yet. It will render a KServe LLMInferenceService with these settings:
+The Application is `argocd/apps/inference/vllm.yaml`. The chart `helm/inference/vllm` renders two objects:
 
-- The router uses the Gateway `kserve/kserve-ingress-gateway` and an llm-d scheduler (endpoint picker) for an InferencePool.
-- For the CPU lab, the vLLM CPU image `docker.io/vllm/vllm-openai-cpu`, with a pinned tag.
-- Autoscaler class `keda` on the metric `sum(vllm:num_requests_waiting)` from Prometheus. Minimum 1 replica, maximum 2 replicas.
-- Pod anti-affinity on `kubernetes.io/hostname`, so that the two replicas run on worker2 and worker3.
-- `nodeSelector: pool: inference` and a toleration for `workload=inference:NoSchedule`.
-- Model URI `s3://models/smollm2-135m-instruct`.
-- Service account `kserve-s3`.
+- The LLMInferenceService `inference/smollm2` (`serving.kserve.io/v1alpha2`).
+- The ServiceAccount `inference/kserve-s3`, which lists the Secret `s3-models`.
 
-The exact LLMInferenceService fields for these settings must be checked against KServe v0.21.0 before the chart is written.
+The LLMInferenceService has these settings:
 
-The ServiceAccount `inference/kserve-s3` refers to the Secret `inference/s3-models`. That Secret holds the read keys from `.lab-secrets.json` and these KServe annotations:
+- Model URI `s3://models/smollm2-135m-instruct`. The KServe storage-initializer downloads it before vLLM starts.
+- Served model name `smollm2-135m-instruct`. Clients send this name in the `model` field.
+- One replica on one inference node, with `nodeSelector: pool: inference` and a toleration for `workload=inference:NoSchedule`.
+- Image `docker.io/vllm/vllm-openai-cpu:v0.23.0`, pinned by digest. This is the CPU image that the KServe v0.21.0 presets use.
+- `VLLM_CPU_KVCACHE_SPACE` 1 GiB. Resources: request 1 CPU and 4Gi, limit 2 CPU and 8Gi.
+- Router: the default llm-d scheduler, and an HTTPRoute on the Gateway `kserve/kserve-ingress-gateway`.
+
+The container `main` is merged with the preset `kserve-config-llm-template`. The preset supplies the `vllm serve /mnt/models` command, port 8000 and the probes. The chart replaces only the image, the security context, the environment, the resources and the liveness probe. The CPU image runs as root, so the chart sets `runAsNonRoot: false`.
+
+The Secret `inference/s3-models` holds the read keys from `.lab-secrets.json` and these KServe annotations. `scripts/argocd-deployment.sh` creates it. To create only this Secret, run `scripts/create-s3-models-secret.sh` in Git Bash. The Secret is not in Git.
 
 ```yaml
 metadata:
   annotations:
     serving.kserve.io/s3-endpoint: seaweedfs-all-in-one.storage.svc:8333
     serving.kserve.io/s3-usehttps: "0"
+    serving.kserve.io/s3-verifyssl: "0"
     serving.kserve.io/s3-region: us-east-1
 stringData:
   AWS_ACCESS_KEY_ID: <readAccessKey>
   AWS_SECRET_ACCESS_KEY: <readSecretKey>
 ```
 
-Create this Secret in `scripts/argocd-deployment.sh`, not in Git. Use the same method as for `storage/seaweedfs-s3-creds`.
+`patches/argocd-app-health.yaml` adds a health check for LLMInferenceService. The vllm app is Healthy only when the `Ready` condition is `True`.
+
+The gateway serves the model at `/<namespace>/<name>/v1/...`. For this model, the paths are:
+
+- `http://localhost:8081/inference/smollm2/v1/chat/completions` from the Windows host.
+- `http://kserve-ingress-gateway.envoy-gateway-system.svc.cluster.local/inference/smollm2/v1/chat/completions` inside the cluster.
+
+The storage-initializer downloads every object under the model prefix. The bucket also holds `.cache/` and `onnx/` under that prefix, about 1.7 GB that vLLM does not use. Delete them to make the download faster (see "Upload the model").
+
+Later: KEDA autoscaling on `sum(vllm:num_requests_waiting)` with 1 to 2 replicas, and pod anti-affinity on `kubernetes.io/hostname` so that the replicas run on worker2 and worker3.
 
 ## Make sure that each stack works
 
