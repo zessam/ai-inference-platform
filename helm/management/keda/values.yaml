@@ -1,0 +1,9 @@
+# Values for the KEDA Helm chart 2.21.0
+# (argocd/apps/management/keda.yaml).
+# Shared cluster add-on. KServe creates a KEDA ScaledObject for each
+# LLMInferenceService with spec.scaling.keda. KEDA reads the trigger metric from Prometheus and drives
+# an HPA that scales the vLLM Deployment.
+
+# Applies to the operator, the metrics API server and the webhooks.
+nodeSelector:
+  pool: management

@@ -11,8 +11,36 @@ model:
   # Value of --served-model-name. Clients send it in the "model" field.
   name: smollm2-135m-instruct
 
-# One replica on one inference node for now.
+# Fixed number of replicas. Used only when autoscaling.enabled is false.
+# The CRD rejects spec.replicas and spec.scaling together.
 replicas: 1
+
+# Autoscaling with KEDA. KServe turns this into a KEDA ScaledObject. KEDA runs
+# the Prometheus query every pollingInterval seconds and drives an HPA:
+# replicas = ceil(query result / threshold), between minReplicas and maxReplicas.
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 2
+  # The vLLM metric that decides the scale. vllm:num_requests_waiting counts
+  # the requests in the queue of each pod (requests that vLLM can not start
+  # yet). The query sums it over all pods of this model.
+  metric: vllm:num_requests_waiting
+  # Target per replica: one replica for each 2 waiting requests.
+  threshold: "2"
+  pollingInterval: 15
+  # Keep a scaled-up replica for 5 minutes after the queue is empty.
+  scaleDownStabilizationSeconds: 300
+  prometheusAddress: http://kube-prometheus-stack-prometheus.monitoring.svc:9090
+
+# Lab only: vLLM runs at most this many requests at the same time, so that a
+# few parallel requests fill the queue and trigger the scaling. Remove it on
+# GPU nodes (vLLM then uses its default).
+maxNumSeqs: 4
+
+# Required pod anti-affinity on kubernetes.io/hostname: each replica runs on a
+# different inference node (worker2, worker3).
+antiAffinity: true
 
 # vLLM CPU build, pinned by tag and digest. This is the CPU image that the
 # KServe v0.21.0 presets use. Replace it with a GPU image for GPU nodes.

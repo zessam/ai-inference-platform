@@ -9,7 +9,26 @@ spec:
   model:
     uri: {{ .Values.model.uri }}
     name: {{ .Values.model.name }}
+{{- if .Values.autoscaling.enabled }}
+  scaling:
+    minReplicas: {{ .Values.autoscaling.minReplicas }}
+    maxReplicas: {{ .Values.autoscaling.maxReplicas }}
+    keda:
+      pollingInterval: {{ .Values.autoscaling.pollingInterval }}
+      triggers:
+        - type: prometheus
+          metadata:
+            serverAddress: {{ .Values.autoscaling.prometheusAddress }}
+            query: 'sum({{ .Values.autoscaling.metric }}{namespace="{{ .Release.Namespace }}",model_name="{{ .Values.model.name }}"})'
+            threshold: {{ .Values.autoscaling.threshold | quote }}
+      advanced:
+        horizontalPodAutoscalerConfig:
+          behavior:
+            scaleDown:
+              stabilizationWindowSeconds: {{ .Values.autoscaling.scaleDownStabilizationSeconds }}
+{{- else }}
   replicas: {{ .Values.replicas }}
+{{- end }}
   router:
     # Defaults: llm-d scheduler, HTTPRoute on kserve/kserve-ingress-gateway.
     scheduler: {}
@@ -21,6 +40,16 @@ spec:
       {{- toYaml .Values.nodeSelector | nindent 6 }}
     tolerations:
       {{- toYaml .Values.tolerations | nindent 6 }}
+    {{- if .Values.antiAffinity }}
+    affinity:
+      podAntiAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          - topologyKey: kubernetes.io/hostname
+            labelSelector:
+              matchLabels:
+                app.kubernetes.io/name: {{ .Values.name }}
+                app.kubernetes.io/component: llminferenceservice-workload
+    {{- end }}
     containers:
       - name: main
         image: {{ .Values.image }}
@@ -30,6 +59,11 @@ spec:
         env:
           - name: VLLM_CPU_KVCACHE_SPACE
             value: {{ .Values.kvCacheSpaceGiB | quote }}
+          {{- if .Values.maxNumSeqs }}
+          # Read by the vllm serve command of the KServe preset.
+          - name: VLLM_ADDITIONAL_ARGS
+            value: "--max-num-seqs {{ .Values.maxNumSeqs }}"
+          {{- end }}
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
         # vLLM on CPU starts slowly. Values from the KServe CPU sample.

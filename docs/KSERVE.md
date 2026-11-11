@@ -88,8 +88,8 @@ In this scenario, the model `smollm2` is Ready, and you send a chat request from
 
 With one replica, the endpoint picker has only one choice. When two or more replicas run, the choice changes the response time. With large models on GPUs, the effect is larger.
 
-## Not installed yet
+## Autoscaling
 
-KEDA is not installed. So, if the queue grows, the number of vLLM replicas does not change. KEDA will read the metric `vllm:num_requests_waiting` from Prometheus. When requests wait in the queue, KEDA will add replicas. Then the new pod downloads the model, joins the InferencePool, and gets traffic from the endpoint picker.
+KEDA is a separate app in the management stack, not part of the `kserve` group. KServe manages the scaling: for each LLMInferenceService with `spec.scaling.keda`, the KServe controller creates and manages a KEDA ScaledObject. KEDA reads the metric `vllm:num_requests_waiting` from Prometheus. When requests wait in the queue, KEDA adds replicas. Then the new pod downloads the model, joins the InferencePool, and gets traffic from the endpoint picker. The section "Autoscaling" in `docs/PLAN.md` describes the details.
 
 The vLLM model `inference/smollm2` is defined in `helm/inference/vllm`. The section "Inference stack" in `docs/PLAN.md` describes it.

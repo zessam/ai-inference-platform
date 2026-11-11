@@ -45,6 +45,13 @@ grafana:
   service:
     type: NodePort
     nodePort: 30030
+  # Put dashboards into the Grafana folder named in the ConfigMap annotation
+  # grafana_folder (helm/monitoring/grafana-dashboards).
+  sidecar:
+    dashboards:
+      folderAnnotation: grafana_folder
+      provider:
+        foldersFromFilesStructure: true
   nodeSelector:
     pool: management
   # Without a fixed password the Grafana chart generates one with Helm lookup.

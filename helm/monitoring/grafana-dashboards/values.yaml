@@ -1,0 +1,14 @@
+# Values for the local grafana-dashboards chart
+# (argocd/apps/monitoring/grafana-dashboards.yaml).
+# Each folder in dashboards/ becomes a Grafana folder. Each JSON file becomes a
+# ConfigMap with the label grafana_dashboard: "1". The Grafana sidecar of
+# kube-prometheus-stack loads these ConfigMaps from all namespaces.
+
+folders:
+  # Official vLLM dashboards from https://github.com/vllm-project/vllm, tag
+  # v0.23.0 (the vLLM image version), unchanged except for the saved variable
+  # selections (data source uid, model names), which are cleared:
+  #   vllm.json                          examples/observability/prometheus_grafana/grafana.json
+  #   vllm-performance-statistics.json   examples/observability/dashboards/grafana/performance_statistics.json
+  #   vllm-query-statistics.json         examples/observability/dashboards/grafana/query_statistics.json
+  vllm: vLLM

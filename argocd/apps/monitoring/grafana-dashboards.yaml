@@ -1,0 +1,34 @@
+# Grafana dashboards (ConfigMaps) for the kube-prometheus-stack Grafana.
+# Local chart helm/monitoring/grafana-dashboards. Wave 1, after
+# kube-prometheus-stack (wave 0).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: grafana-dashboards
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/zessam/ai-inference-platform.git
+    targetRevision: main
+    path: helm/monitoring/grafana-dashboards
+    helm:
+      releaseName: grafana-dashboards
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

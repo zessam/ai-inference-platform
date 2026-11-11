@@ -22,8 +22,8 @@ A sync wave is a number on an Application. Argo CD syncs lower numbers first. Th
 | Stack | Stack sync wave | Status |
 | --- | --- | --- |
 | storage | 0 | Created: seaweedfs |
-| monitoring | 0 | Created: kube-prometheus-stack |
-| management | 1 | Created: KServe group (cert-manager, LeaderWorkerSet, Envoy Gateway, Envoy AI Gateway, KServe LLMInferenceService), LiteLLM group (CloudNativePG, PostgreSQL, LiteLLM) |
+| monitoring | 0 | Created: kube-prometheus-stack, grafana-dashboards |
+| management | 1 | Created: KEDA, KServe group (cert-manager, LeaderWorkerSet, Envoy Gateway, Envoy AI Gateway, KServe LLMInferenceService), LiteLLM group (CloudNativePG, PostgreSQL, LiteLLM) |
 | inference | 2 | Created: vllm |
 
 The sync wave of an app applies only inside its stack. For example, kserve-llmisvc-resources has wave 2 in the management stack. It starts after the other management apps, not at the same time as the inference stack.
@@ -77,11 +77,39 @@ The Application is `argocd/apps/monitoring/kube-prometheus-stack.yaml`. The valu
 
 The Grafana chart generates a random admin password with Helm `lookup`. Argo CD cannot run `lookup`, so the password changes on every sync. To prevent this, Grafana reads its password from the Secret `monitoring/grafana-admin`. `scripts/argocd-deployment.sh` creates that Secret from the value `grafanaAdminPassword` in `.lab-secrets.json`. The Secret is not in Git.
 
+### Grafana dashboards
+
+The app `grafana-dashboards` (`argocd/apps/monitoring/grafana-dashboards.yaml`, sync wave 1) adds dashboards to Grafana. Its local chart `helm/monitoring/grafana-dashboards` turns each JSON file in `dashboards/<folder>/` into a ConfigMap with the label `grafana_dashboard: "1"`. The Grafana sidecar loads these ConfigMaps from all namespaces. The annotation `grafana_folder` sets the Grafana folder. For this, `helm/monitoring/kube-prometheus-stack/values.yaml` sets `grafana.sidecar.dashboards.folderAnnotation` and `foldersFromFilesStructure`.
+
+The folder "vLLM" holds the official vLLM dashboards from the vLLM repository, tag v0.23.0:
+
+| File | Title | Source in the vLLM repository |
+| --- | --- | --- |
+| vllm.json | vLLM | examples/observability/prometheus_grafana/grafana.json |
+| vllm-performance-statistics.json | Performance Statistics | examples/observability/dashboards/grafana/performance_statistics.json |
+| vllm-query-statistics.json | Query Statistics_New4 | examples/observability/dashboards/grafana/query_statistics.json |
+
+The only change to the files is that the saved variable selections (data source uid and model names) are cleared. Grafana then selects the default Prometheus and the first model.
+
+To add a dashboard, put its JSON file in `helm/monitoring/grafana-dashboards/dashboards/<folder>/`. For a new folder, also add it under `folders` in the values.
+
 Later: Langfuse on node port 30300.
 
 ## Management stack (created)
 
-The management stack installs KServe for LLMInferenceService and everything that it needs. All these apps are in the group `kserve`: the Applications in `argocd/apps/management/kserve/` and the values in `helm/management/kserve/`. The group Application `argocd/apps/management/kserve.yaml` syncs them. The sync waves in the table apply inside that group. It does not install the KServe InferenceService controller (`kserve-crd` and `kserve-resources`). The versions come from `kserve-deps.env` in KServe v0.21.0, except Envoy Gateway, which uses the newest v1.8 patch release.
+The management stack syncs its apps in this order:
+
+| Sync wave | App or group | Content |
+| --- | --- | --- |
+| 0 | keda | KEDA 2.21.0, shared autoscaler |
+| 1 | kserve (group) | KServe LLMInferenceService and its dependencies |
+| 2 | litellm-group (group) | LiteLLM with its PostgreSQL database |
+
+KEDA is a shared cluster add-on, so it is not in the `kserve` group. Only one KEDA can run in a cluster, and other apps can also use it. The Application is `argocd/apps/management/keda.yaml`, and the values are in `helm/management/keda/values.yaml`. KServe does not install KEDA, but it manages the KEDA objects for each model (see "Autoscaling").
+
+### KServe group
+
+The `kserve` group installs KServe for LLMInferenceService and everything that it needs. All these apps are in the group `kserve`: the Applications in `argocd/apps/management/kserve/` and the values in `helm/management/kserve/`. The group Application `argocd/apps/management/kserve.yaml` syncs them. The sync waves in the table apply inside that group. It does not install the KServe InferenceService controller (`kserve-crd` and `kserve-resources`). The versions come from `kserve-deps.env` in KServe v0.21.0, except Envoy Gateway, which uses the newest v1.8 patch release.
 
 | App | Chart repository | Chart | Version | Namespace | Sync wave | Key values |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -119,7 +147,7 @@ The presets in `kserve-runtime-configs` use the image `ghcr.io/llm-d/llm-d-cuda`
 
 LiteLLM Proxy is the API entry point for clients. It gives one OpenAI-compatible API for the vLLM model and for external providers. It adds API keys, budgets and rate limits per user or team, retries and fallbacks, and a web UI with usage and spend. It replaces Portkey, because the open-source Portkey gateway has no UI and no analytics.
 
-All LiteLLM apps are in the group `litellm`. The group Application `argocd/apps/management/litellm.yaml` (name `litellm-group`) syncs the folder `argocd/apps/management/litellm/`. It has sync wave 1, so it starts after the `kserve` group (wave 0) is Healthy.
+All LiteLLM apps are in the group `litellm`. The group Application `argocd/apps/management/litellm.yaml` (name `litellm-group`) syncs the folder `argocd/apps/management/litellm/`. It has sync wave 2, so it starts after the `kserve` group (wave 1) is Healthy.
 
 | App | Chart repository | Chart | Version | Namespace | Sync wave | Key values |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -150,7 +178,7 @@ curl http://localhost:8080/v1/chat/completions \
 
 LiteLLM stores spend logs in PostgreSQL. For analytics in ClickHouse, Langfuse is the planned option. Recent Langfuse versions store traces in ClickHouse, and LiteLLM can send each request to Langfuse with its `success_callback` setting. Langfuse also has a UI for traces, prompts, latency and costs.
 
-Later: KEDA 2.21.0 for autoscaling, Langfuse with ClickHouse on node port 30300, Guardrails AI on node port 30082.
+Later: Langfuse with ClickHouse on node port 30300, Guardrails AI on node port 30082.
 
 ## Inference stack (created)
 
@@ -168,7 +196,9 @@ The LLMInferenceService has these settings:
 
 - Model URI `s3://models/smollm2-135m-instruct`. The KServe storage-initializer downloads it before vLLM starts.
 - Served model name `smollm2-135m-instruct`. Clients send this name in the `model` field.
-- One replica on one inference node, with `nodeSelector: pool: inference` and a toleration for `workload=inference:NoSchedule`.
+- `nodeSelector: pool: inference` and a toleration for `workload=inference:NoSchedule`.
+- Required pod anti-affinity on `kubernetes.io/hostname`, so that each replica runs on a different inference node.
+- Autoscaling from 1 to 2 replicas with KEDA (see below).
 - Image `docker.io/vllm/vllm-openai-cpu:v0.23.0`, pinned by digest. This is the CPU image that the KServe v0.21.0 presets use.
 - `VLLM_CPU_KVCACHE_SPACE` 1 GiB. Resources: request 1 CPU and 4Gi, limit 2 CPU and 8Gi.
 - Router: the default llm-d scheduler, and an HTTPRoute on the Gateway `kserve/kserve-ingress-gateway`.
@@ -198,7 +228,27 @@ The gateway serves the model at `/<namespace>/<name>/v1/...`. For this model, th
 
 The storage-initializer downloads every object under the model prefix. The bucket also holds `.cache/` and `onnx/` under that prefix, about 1.7 GB that vLLM does not use. Delete them to make the download faster (see "Upload the model").
 
-Later: KEDA autoscaling on `sum(vllm:num_requests_waiting)` with 1 to 2 replicas, and pod anti-affinity on `kubernetes.io/hostname` so that the replicas run on worker2 and worker3.
+### Autoscaling
+
+KServe manages the scaling, and KEDA does the work. You do not write a ScaledObject or an HPA. KEDA 2.21.0 is a separate app in wave 0 of the management stack, before the `kserve` group. The KServe controller watches ScaledObjects only if the KEDA CRDs exist when the controller starts. If the controller started before KEDA existed, restart it once: `kubectl -n kserve rollout restart deployment/llmisvc-controller-manager`.
+
+The scaling chain has these steps:
+
+1. `spec.scaling.keda` in the LLMInferenceService describes the trigger. The CRD does not accept `spec.replicas` and `spec.scaling` together.
+2. The KServe controller creates a KEDA ScaledObject for the vLLM Deployment.
+3. KEDA runs the Prometheus query every 15 seconds and creates an HPA.
+4. The HPA sets the number of replicas of the vLLM Deployment.
+5. A new vLLM pod joins the InferencePool, and the llm-d scheduler sends traffic to it.
+
+The scaling metric is `vllm:num_requests_waiting`. It counts the requests that wait in the queue of each vLLM pod, because vLLM cannot start them yet. The query is `sum(vllm:num_requests_waiting{namespace="inference",model_name="smollm2-135m-instruct"})`. The PodMonitor `smollm2-vllm` makes Prometheus scrape it.
+
+KEDA sets the replicas to the query result divided by the threshold 2, rounded up, from 1 to 2. For example, 3 waiting requests give 2 replicas. After the queue is empty, the HPA keeps the second replica for 300 seconds before it scales down.
+
+The values are in `helm/inference/vllm/values.yaml` under `autoscaling`. `autoscaling.enabled: false` turns the scaling off and uses `replicas` instead.
+
+In the lab, `maxNumSeqs: 4` limits vLLM to 4 requests at the same time (`--max-num-seqs 4`, through `VLLM_ADDITIONAL_ARGS`). Without the limit, vLLM on CPU accepts many requests at once, and the queue does not fill in a test. Remove the limit on GPU nodes.
+
+Before the first scale-up, pull the vLLM image on worker3, so that the second pod does not wait for the download: `docker exec inference-lab-worker3 crictl pull <image of helm/inference/vllm/values.yaml>`.
 
 ## Make sure that each stack works
 

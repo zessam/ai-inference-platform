@@ -1,6 +1,6 @@
 # Group Application "litellm". Syncs the Applications in
 # argocd/apps/management/litellm: the CloudNativePG operator, the PostgreSQL
-# database and the LiteLLM proxy. Sync wave 1, after the kserve group, because
+# database and the LiteLLM proxy. Sync wave 2, after the kserve group (wave 1), because
 # LiteLLM sends requests to the KServe gateway.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
@@ -8,7 +8,7 @@ metadata:
   name: litellm-group
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "1"
+    argocd.argoproj.io/sync-wave: "2"
 spec:
   project: default
   source:

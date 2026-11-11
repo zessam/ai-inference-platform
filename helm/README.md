@@ -19,9 +19,11 @@ A group folder holds apps that belong together. It has the same name in `argocd/
 | Stack/group | App | Chart repository | Chart | Version | Node pool |
 | --- | --- | --- | --- | --- | --- |
 | storage | seaweedfs | https://seaweedfs.github.io/seaweedfs/helm | seaweedfs | 4.53.0 | storage |
+| monitoring | grafana-dashboards | This repository | helm/monitoring/grafana-dashboards | 0.1.0 | No pods |
 | monitoring | kube-prometheus-stack | https://prometheus-community.github.io/helm-charts | kube-prometheus-stack | 93.1.2 | management |
 | management/kserve | cert-manager | https://charts.jetstack.io | cert-manager | v1.21.3 | management |
 | management/kserve | lws | registry.k8s.io/lws/charts (OCI) | lws | v0.8.0 | management |
+| management | keda | https://kedacore.github.io/charts | keda | 2.21.0 | management |
 | management/kserve | envoy-gateway | docker.io/envoyproxy (OCI) | gateway-helm | v1.8.6 | management |
 | management/kserve | envoy-ai-gateway | docker.io/envoyproxy (OCI) | ai-gateway-helm | v1.1.0 | management |
 | management/kserve | kserve-llmisvc-resources | ghcr.io/kserve/charts (OCI) | kserve-llmisvc-resources | v0.21.0 | management |
