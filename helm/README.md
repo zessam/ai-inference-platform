@@ -17,6 +17,7 @@ The stack names are the same as the folder names in `argocd/apps/`: storage, mon
 | Stack | App | Chart repository | Chart | Version | Node pool |
 | --- | --- | --- | --- | --- | --- |
 | storage | seaweedfs | https://seaweedfs.github.io/seaweedfs/helm | seaweedfs | 4.53.0 | storage |
+| monitoring | kube-prometheus-stack | https://prometheus-community.github.io/helm-charts | kube-prometheus-stack | 93.1.2 | management |
 
 `docs/PLAN.md` lists the apps that come next.
 

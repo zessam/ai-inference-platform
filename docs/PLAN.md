@@ -1,6 +1,6 @@
 # Argo CD platform plan
 
-This file lists the Argo CD Applications for each stack. A stack is a group of apps that Argo CD syncs together. All four stack Applications exist. Only the storage stack has an app now. The folders of the other stacks contain only a `.gitkeep` file.
+This file lists the Argo CD Applications for each stack. A stack is a group of apps that Argo CD syncs together. All four stack Applications exist. The storage and monitoring stacks have apps now. The folders of the other stacks contain only a `.gitkeep` file.
 
 ## Layout
 
@@ -21,7 +21,7 @@ A sync wave is a number on an Application. Argo CD syncs lower numbers first. Th
 | Stack | Stack sync wave | Status |
 | --- | --- | --- |
 | storage | 0 | Created: seaweedfs |
-| monitoring | 0 | Planned |
+| monitoring | 0 | Created: kube-prometheus-stack |
 | management | 1 | Planned |
 | inference | 2 | Planned |
 
@@ -50,7 +50,7 @@ Node placement:
 
 The Application is `argocd/apps/storage/seaweedfs.yaml`. The values are in `helm/storage/seaweedfs/values.yaml`. `scripts/argocd-deployment.sh` creates the Secret `storage/seaweedfs-s3-creds` from `.lab-secrets.json`. The Secret is not in Git.
 
-## Monitoring stack (planned)
+## Monitoring stack (created)
 
 | App | Chart repository | Chart | Version | Namespace | Sync wave | Key values |
 | --- | --- | --- | --- | --- | --- | --- |
@@ -69,6 +69,10 @@ Values for kube-prometheus-stack:
 With the selector values set to `false`, Prometheus reads ServiceMonitors and PodMonitors from all Helm releases, not only from its own release. The vLLM metrics need this.
 
 The node-exporter chart default tolerates all taints. The empty list keeps node-exporter off the tainted nodes. Then Prometheus gets node metrics only from the management node.
+
+The Application is `argocd/apps/monitoring/kube-prometheus-stack.yaml`. The values are in `helm/monitoring/kube-prometheus-stack/values.yaml`.
+
+The Grafana chart generates a random admin password with Helm `lookup`. Argo CD cannot run `lookup`, so the password changes on every sync. To prevent this, Grafana reads its password from the Secret `monitoring/grafana-admin`. `scripts/argocd-deployment.sh` creates that Secret from the value `grafanaAdminPassword` in `.lab-secrets.json`. The Secret is not in Git.
 
 Later: Langfuse on node port 30300.
 

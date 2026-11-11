@@ -1,0 +1,68 @@
+# Values for the kube-prometheus-stack Helm chart 93.1.2
+# (argocd/apps/monitoring/kube-prometheus-stack.yaml).
+# Everything runs on the management node (pool=management).
+# Host ports from cluster/kind-config.yaml: Prometheus 9090 -> 30090,
+# Grafana 3000 -> 30030.
+
+alertmanager:
+  enabled: false
+
+# kind does not expose these control-plane components to Prometheus.
+kubeEtcd:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
+
+prometheusOperator:
+  nodeSelector:
+    pool: management
+  admissionWebhooks:
+    patch:
+      nodeSelector:
+        pool: management
+
+prometheus:
+  service:
+    type: NodePort
+    nodePort: 30090
+  prometheusSpec:
+    retention: 2d
+    nodeSelector:
+      pool: management
+    # Select rules and monitors from all releases, not only this one.
+    # The vLLM PodMonitor comes from another release.
+    ruleSelectorNilUsesHelmValues: false
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+    scrapeConfigSelectorNilUsesHelmValues: false
+
+grafana:
+  service:
+    type: NodePort
+    nodePort: 30030
+  nodeSelector:
+    pool: management
+  # Without a fixed password the Grafana chart generates one with Helm lookup.
+  # Argo CD can't run lookup, so the password would change on every sync.
+  # scripts/argocd-deployment.sh creates monitoring/grafana-admin from
+  # .lab-secrets.json.
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+
+kube-state-metrics:
+  nodeSelector:
+    pool: management
+
+# The chart default tolerates every NoSchedule taint. The empty list and the
+# nodeSelector keep node-exporter on the management node only.
+prometheus-node-exporter:
+  nodeSelector:
+    pool: management
+  tolerations: []
