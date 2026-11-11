@@ -1,0 +1,68 @@
+# Values for the litellm-helm chart 1.106.7
+# (argocd/apps/management/litellm/litellm.yaml).
+
+image:
+  tag: "1.106.7"
+  pullPolicy: IfNotPresent
+
+nodeSelector:
+  pool: management
+
+# The Secret litellm-secrets is created outside Git (scripts) with:
+#   LITELLM_MASTER_KEY  admin key for the API and the UI (password for "admin")
+#   LITELLM_SALT_KEY    encrypts credentials stored in the database. Do not
+#                       change it after the first start.
+# Without masterkeySecretName, the chart generates the key with Helm lookup.
+# Argo CD can't run lookup, so the key would change on every sync.
+masterkeySecretName: litellm-secrets
+masterkeySecretKey: LITELLM_MASTER_KEY
+environmentSecrets:
+  - litellm-secrets
+
+# PostgreSQL from CloudNativePG (litellm-db). Not the bundled Bitnami chart:
+# its password would be in Git, and its bitnamilegacy images get no updates.
+db:
+  deployStandalone: false
+  useExisting: true
+  database: litellm
+  secret:
+    name: litellm-db-app
+    usernameKey: username
+    passwordKey: password
+    endpointKey: host
+
+proxy_config:
+  model_list:
+    # The vLLM model behind the KServe gateway (Envoy, llm-d scheduler).
+    # Path /<namespace>/<name>/v1 of the LLMInferenceService inference/smollm2.
+    - model_name: smollm2-135m-instruct
+      litellm_params:
+        model: hosted_vllm/smollm2-135m-instruct
+        api_base: http://kserve-ingress-gateway.envoy-gateway-system.svc.cluster.local/inference/smollm2/v1
+  general_settings:
+    master_key: os.environ/PROXY_MASTER_KEY
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 512Mi
+  limits:
+    memory: 2Gi
+
+# The chart Service has no nodePort field. This second Service exposes the
+# proxy and the UI on NodePort 30080. kind maps host 127.0.0.1:8080 to it.
+extraResources:
+  - apiVersion: v1
+    kind: Service
+    metadata:
+      name: litellm-nodeport
+    spec:
+      type: NodePort
+      selector:
+        app.kubernetes.io/name: litellm
+        app.kubernetes.io/instance: litellm
+      ports:
+        - name: http
+          port: 4000
+          targetPort: http
+          nodePort: 30080

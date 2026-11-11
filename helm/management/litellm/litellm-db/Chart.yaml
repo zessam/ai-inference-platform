@@ -1,0 +1,5 @@
+apiVersion: v2
+name: litellm-db
+description: CloudNativePG PostgreSQL cluster for LiteLLM
+type: application
+version: 0.1.0

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Installs Argo CD on the kind cluster, applies the patches, labels the nodes,
-# creates the SeaweedFS S3 and Grafana credentials, applies the root app-of-apps, and
+# creates the SeaweedFS S3, Grafana and LiteLLM credentials, applies the root app-of-apps, and
 # prints the admin password.
 # Run from any directory. Works in Git Bash on Windows.
 # Safe to run again on the same cluster.
@@ -110,11 +110,15 @@ ADMIN_SECRET_KEY=$(json_get adminSecretKey)
 READ_ACCESS_KEY=$(json_get readAccessKey)
 READ_SECRET_KEY=$(json_get readSecretKey)
 GRAFANA_ADMIN_PASSWORD=$(json_get grafanaAdminPassword)
+LITELLM_MASTER_KEY=$(json_get litellmMasterKey)
+LITELLM_SALT_KEY=$(json_get litellmSaltKey)
 [[ -n "$ADMIN_ACCESS_KEY" ]] || ADMIN_ACCESS_KEY=$(gen 'A-Z0-9' 20)
 [[ -n "$ADMIN_SECRET_KEY" ]] || ADMIN_SECRET_KEY=$(gen 'A-Za-z0-9' 40)
 [[ -n "$READ_ACCESS_KEY" ]] || READ_ACCESS_KEY=$(gen 'A-Z0-9' 20)
 [[ -n "$READ_SECRET_KEY" ]] || READ_SECRET_KEY=$(gen 'A-Za-z0-9' 40)
 [[ -n "$GRAFANA_ADMIN_PASSWORD" ]] || GRAFANA_ADMIN_PASSWORD=$(gen 'A-Za-z0-9' 24)
+[[ -n "$LITELLM_MASTER_KEY" ]] || LITELLM_MASTER_KEY="sk-$(gen 'A-Za-z0-9' 32)"
+[[ -n "$LITELLM_SALT_KEY" ]] || LITELLM_SALT_KEY="sk-$(gen 'A-Za-z0-9' 32)"
 ( umask 077
   cat > "$SECRETS_FILE" <<EOF
 {
@@ -122,7 +126,9 @@ GRAFANA_ADMIN_PASSWORD=$(json_get grafanaAdminPassword)
   "adminSecretKey": "$ADMIN_SECRET_KEY",
   "readAccessKey": "$READ_ACCESS_KEY",
   "readSecretKey": "$READ_SECRET_KEY",
-  "grafanaAdminPassword": "$GRAFANA_ADMIN_PASSWORD"
+  "grafanaAdminPassword": "$GRAFANA_ADMIN_PASSWORD",
+  "litellmMasterKey": "$LITELLM_MASTER_KEY",
+  "litellmSaltKey": "$LITELLM_SALT_KEY"
 }
 EOF
 )
@@ -165,6 +171,15 @@ stringData:
   AWS_SECRET_ACCESS_KEY: "$READ_SECRET_KEY"
 EOF
 
+echo "==> Creating namespace litellm and Secret litellm/litellm-secrets"
+# LiteLLM master key (API and UI admin) and salt key (encrypts credentials in
+# the database). helm/management/litellm/litellm reads this Secret.
+kubectl create namespace litellm --dry-run=client -o yaml | kubectl apply -f -
+kubectl -n litellm create secret generic litellm-secrets \
+  --from-literal=LITELLM_MASTER_KEY="$LITELLM_MASTER_KEY" \
+  --from-literal=LITELLM_SALT_KEY="$LITELLM_SALT_KEY" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
 # --- App of apps -------------------------------------------------------------
 echo "==> Applying $ROOT_APP"
 kubectl apply -f "$ROOT_APP"
@@ -178,4 +193,5 @@ echo "S3 endpoint: http://localhost:8333"
 echo "S3 keys:     $SECRETS_FILE (admin and read identities)"
 echo
 echo "Grafana:     http://localhost:3000 (admin, password in $SECRETS_FILE)"
+echo "LiteLLM UI:  http://localhost:8080/ui (admin, litellmMasterKey in $SECRETS_FILE)"
 echo "Prometheus:  http://localhost:9090"

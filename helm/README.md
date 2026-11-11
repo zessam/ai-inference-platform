@@ -27,7 +27,9 @@ A group folder holds apps that belong together. It has the same name in `argocd/
 | management/kserve | kserve-llmisvc-resources | ghcr.io/kserve/charts (OCI) | kserve-llmisvc-resources | v0.21.0 | management |
 | management/kserve | kserve-runtime-configs | ghcr.io/kserve/charts (OCI) | kserve-runtime-configs | v0.21.0 | No pods |
 | management/kserve | kserve-gateway | This repository | helm/management/kserve/kserve-gateway | 0.1.0 | management |
-| management | portkey | This repository | helm/management/portkey | 0.1.0 | management |
+| management/litellm | cloudnative-pg | https://cloudnative-pg.github.io/charts | cloudnative-pg | 0.29.1 | management |
+| management/litellm | litellm-db | This repository | helm/management/litellm/litellm-db | 0.1.0 | management |
+| management/litellm | litellm | ghcr.io/berriai (OCI) | litellm-helm | 1.106.7 | management |
 | inference | vllm | This repository | helm/inference/vllm | 0.1.0 | inference |
 
 The CRD charts `envoy-ai-gateway-crds` and `kserve-llmisvc-crd` have no values file, so they have no folder here.

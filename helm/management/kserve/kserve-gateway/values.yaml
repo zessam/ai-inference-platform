@@ -13,7 +13,7 @@ gatewayClass:
 envoyProxy:
   name: kserve-ingress
   namespace: envoy-gateway-system
-  # Fixed name for the proxy Service, so that other apps (Portkey) can reach
+  # Fixed name for the proxy Service, so that other apps (LiteLLM) can reach
   # the gateway at kserve-ingress-gateway.envoy-gateway-system.svc.
   serviceName: kserve-ingress-gateway
   # kind maps host 127.0.0.1:8081 to this port (cluster/kind-config.yaml).

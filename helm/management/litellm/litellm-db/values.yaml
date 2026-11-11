@@ -1,0 +1,24 @@
+# Values for the local litellm-db chart
+# (argocd/apps/management/litellm/litellm-db.yaml).
+
+name: litellm-db
+instances: 1
+
+# PostgreSQL 17, pinned. "minimal" has no extra extensions.
+imageName: ghcr.io/cloudnative-pg/postgresql:17.9-minimal-trixie
+
+database: litellm
+owner: litellm
+
+# Uses the default StorageClass of the cluster (kind: "standard").
+storageSize: 2Gi
+
+nodeSelector:
+  pool: management
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 1Gi

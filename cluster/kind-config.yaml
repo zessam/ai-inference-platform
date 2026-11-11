@@ -7,7 +7,7 @@ networking:
 nodes:
 - role: control-plane
   extraPortMappings:
-  - {containerPort: 30080, hostPort: 8080, listenAddress: "127.0.0.1"}  # Portkey
+  - {containerPort: 30080, hostPort: 8080, listenAddress: "127.0.0.1"}  # LiteLLM
   - {containerPort: 30081, hostPort: 8081, listenAddress: "127.0.0.1"}  # llm-d / KServe gateway
   - {containerPort: 30082, hostPort: 8082, listenAddress: "127.0.0.1"}  # Guardrails API
   - {containerPort: 30030, hostPort: 3000, listenAddress: "127.0.0.1"}  # Grafana

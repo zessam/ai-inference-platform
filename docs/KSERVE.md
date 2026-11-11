@@ -56,7 +56,7 @@ The kserve-gateway chart is the only component that this repository defines. KSe
 - The GatewayClass `envoy` connects the Gateway API to Envoy Gateway.
 - The Gateway `kserve/kserve-ingress-gateway` listens on port 80. KServe uses this Gateway by default.
 
-kind maps host port 8081 to NodePort 30081. So, on the Windows host, the gateway is at `http://localhost:8081`. Inside the cluster, the gateway is at `http://kserve-ingress-gateway.envoy-gateway-system.svc`. The EnvoyProxy gives the proxy Service this fixed name, so that Portkey can send requests to it.
+kind maps host port 8081 to NodePort 30081. So, on the Windows host, the gateway is at `http://localhost:8081`. Inside the cluster, the gateway is at `http://kserve-ingress-gateway.envoy-gateway-system.svc`. The EnvoyProxy gives the proxy Service this fixed name, so that LiteLLM can send requests to it.
 
 ## Scenario: deploy a model
 

@@ -1,10 +1,10 @@
-# Portkey AI Gateway (open-source). One OpenAI-compatible API in front of the
-# models. Local chart helm/management/portkey. Sync wave 1, after the kserve
-# group (wave 0), because Portkey sends requests to the KServe gateway.
+# PostgreSQL database for LiteLLM (CNPG Cluster litellm/litellm-db).
+# Local chart helm/management/litellm/litellm-db. CNPG creates the Secret
+# litellm-db-app with the user, password and host.
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: portkey
+  name: litellm-db
   namespace: argocd
   annotations:
     argocd.argoproj.io/sync-wave: "1"
@@ -13,12 +13,12 @@ spec:
   source:
     repoURL: https://github.com/zessam/ai-inference-platform.git
     targetRevision: main
-    path: helm/management/portkey
+    path: helm/management/litellm/litellm-db
     helm:
-      releaseName: portkey
+      releaseName: litellm-db
   destination:
     server: https://kubernetes.default.svc
-    namespace: portkey
+    namespace: litellm
   syncPolicy:
     automated:
       prune: true
@@ -32,3 +32,4 @@ spec:
     syncOptions:
       - CreateNamespace=true
       - ServerSideApply=true
+      - RespectIgnoreDifferences=true

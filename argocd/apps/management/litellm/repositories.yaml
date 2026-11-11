@@ -1,0 +1,17 @@
+# Argo CD repository Secret for the LiteLLM Helm chart in the OCI registry
+# ghcr.io/berriai. No credentials: the registry is public.
+# Sync wave -1 so it exists before the litellm Application.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: repo-berriai-oci
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+stringData:
+  type: helm
+  name: berriai
+  url: ghcr.io/berriai
+  enableOCI: "true"

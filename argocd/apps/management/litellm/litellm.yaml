@@ -1,0 +1,40 @@
+# LiteLLM proxy. One OpenAI-compatible API with keys, budgets and a UI.
+# It sends requests for the vLLM model to the KServe gateway.
+# Needs the Secret litellm/litellm-secrets, which scripts create outside Git.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: litellm
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  sources:
+    - repoURL: ghcr.io/berriai
+      chart: litellm-helm
+      targetRevision: 1.106.7
+      helm:
+        releaseName: litellm
+        valueFiles:
+          - $values/helm/management/litellm/litellm/values.yaml
+    - repoURL: https://github.com/zessam/ai-inference-platform.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: litellm
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true
