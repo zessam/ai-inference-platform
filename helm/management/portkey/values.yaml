@@ -1,0 +1,23 @@
+# Values for the local portkey chart (argocd/apps/management/portkey.yaml).
+# This is the open-source gateway. It has no analytics store. ClickHouse
+# analytics needs the Portkey enterprise gateway (see docs/PLAN.md).
+
+image:
+  repository: docker.io/portkeyai/gateway
+  tag: "1.15.2"
+
+replicas: 1
+
+# kind maps host 127.0.0.1:8080 to this port (cluster/kind-config.yaml).
+nodePort: 30080
+
+nodeSelector:
+  pool: management
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi

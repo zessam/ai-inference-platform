@@ -23,7 +23,7 @@ A sync wave is a number on an Application. Argo CD syncs lower numbers first. Th
 | --- | --- | --- |
 | storage | 0 | Created: seaweedfs |
 | monitoring | 0 | Created: kube-prometheus-stack |
-| management | 1 | Created: cert-manager, LeaderWorkerSet, Envoy Gateway, Envoy AI Gateway, KServe LLMInferenceService |
+| management | 1 | Created: KServe group (cert-manager, LeaderWorkerSet, Envoy Gateway, Envoy AI Gateway, KServe LLMInferenceService), Portkey |
 | inference | 2 | Planned |
 
 The sync wave of an app applies only inside its stack. For example, kserve-llmisvc-resources has wave 2 in the management stack. It starts after the other management apps, not at the same time as the inference stack.
@@ -115,7 +115,44 @@ The local chart `helm/management/kserve/kserve-gateway` creates three resources:
 
 The presets in `kserve-runtime-configs` use the image `ghcr.io/llm-d/llm-d-cuda`, which needs a GPU. For the CPU lab, the LLMInferenceService must set a CPU image. The presets already refer to `docker.io/vllm/vllm-openai-cpu:v0.23.0`.
 
-Later: KEDA 2.21.0 for autoscaling, Guardrails AI on node port 30082, Portkey on node port 30080.
+## Portkey (created)
+
+| App | Chart repository | Chart | Version | Namespace | Sync wave | Key values |
+| --- | --- | --- | --- | --- | --- | --- |
+| portkey | This repository | helm/management/portkey | 0.1.0, image `portkeyai/gateway:1.15.2` | portkey | 1 in the management stack | NodePort 30080, pool=management |
+
+Portkey is an AI gateway. It gives clients one OpenAI-compatible API and adds retries, fallbacks and routing between providers. This setup uses the open-source gateway, because the open-source image is public. The Application is `argocd/apps/management/portkey.yaml`. It has sync wave 1, so it starts after the `kserve` group (wave 0) is Healthy.
+
+On the Windows host, Portkey is at `http://localhost:8080`. kind maps that port to NodePort 30080. Inside the cluster, Portkey is at `http://portkey-gateway.portkey.svc:8787`.
+
+Portkey sends a request to the upstream that the client names in two headers. For a model behind KServe, the client sends these headers:
+
+```
+x-portkey-provider: openai
+x-portkey-custom-host: http://kserve-ingress-gateway.envoy-gateway-system.svc.cluster.local/<route path of the model>/v1
+```
+
+`kserve-ingress-gateway.envoy-gateway-system.svc` is the Envoy proxy Service of the KServe gateway. The EnvoyProxy in `helm/management/kserve/kserve-gateway` gives it this fixed name. The route path of the model is known after the vLLM LLMInferenceService exists.
+
+### Analytics with ClickHouse (not ready)
+
+The open-source gateway has no analytics store. Request logs and analytics in ClickHouse need the Portkey enterprise gateway. These facts come from the official chart `gateway` 1.7.8 in https://github.com/Portkey-AI/helm (`charts/portkey-gateway`):
+
+- The images `docker.io/portkeyai/gateway_enterprise` and `docker.io/portkeyai/data-service` are private. You need Docker credentials from Portkey.
+- The gateway needs `PORTKEY_CLIENT_AUTH`, a key from Portkey.
+- ClickHouse is set with the environment values `ANALYTICS_STORE: clickhouse`, `ANALYTICS_STORE_ENDPOINT`, `ANALYTICS_STORE_USER`, `ANALYTICS_STORE_PASSWORD`, `ANALYTICS_LOG_TABLE` and `ANALYTICS_FEEDBACK_TABLE`.
+
+The repository https://github.com/Portkey-AI/helm-chart is deprecated. Its README points to `Portkey-AI/helm`.
+
+To move to ClickHouse analytics later, do these steps:
+
+1. Get the enterprise license, the Docker credentials and `PORTKEY_CLIENT_AUTH` from Portkey.
+2. Deploy ClickHouse as an Argo CD app, for example in a new `analytics` group.
+3. Create a Secret outside Git with the Docker credentials, `PORTKEY_CLIENT_AUTH` and the ClickHouse password, in the same way as `storage/seaweedfs-s3-creds`.
+4. Replace the local chart in `argocd/apps/management/portkey.yaml` with the official chart from https://portkey-ai.github.io/helm, chart `gateway`, with a pinned version.
+5. Put the ClickHouse values in `helm/management/portkey/values.yaml`.
+
+Later: KEDA 2.21.0 for autoscaling, Guardrails AI on node port 30082.
 
 ## Inference stack (planned)
 
