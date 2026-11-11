@@ -242,7 +242,9 @@ The scaling chain has these steps:
 
 The scaling metric is `vllm:num_requests_waiting`. It counts the requests that wait in the queue of each vLLM pod, because vLLM cannot start them yet. The query is `sum(vllm:num_requests_waiting{namespace="inference",model_name="smollm2-135m-instruct"})`. The PodMonitor `smollm2-vllm` makes Prometheus scrape it.
 
-KEDA sets the replicas to the query result divided by the threshold 2, rounded up, from 1 to 2. For example, 3 waiting requests give 2 replicas. After the queue is empty, the HPA keeps the second replica for 300 seconds before it scales down.
+KEDA sets the replicas to the query result divided by the threshold 2, rounded up, from 1 to 2. For example, 3 waiting requests give 2 replicas. After the queue is empty, the HPA keeps the second replica for 300 seconds before it scales down. This is the HPA default.
+
+The chart does not set `scaling.keda.advanced.horizontalPodAutoscalerConfig`. In KServe v0.21.0, the CRD validation rule for that field reads `name` without first testing that `name` exists. So any value without `name` fails with `no such key: name`, and the field cannot be used.
 
 The values are in `helm/inference/vllm/values.yaml` under `autoscaling`. `autoscaling.enabled: false` turns the scaling off and uses `replicas` instead.
 

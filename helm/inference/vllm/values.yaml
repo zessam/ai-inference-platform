@@ -29,8 +29,9 @@ autoscaling:
   # Target per replica: one replica for each 2 waiting requests.
   threshold: "2"
   pollingInterval: 15
-  # Keep a scaled-up replica for 5 minutes after the queue is empty.
-  scaleDownStabilizationSeconds: 300
+  # Scale-down: the HPA default stabilization window applies. A scaled-up
+  # replica stays for 300 seconds after the queue is empty. It can not be set
+  # here, because of a CRD validation bug in KServe v0.21.0 (see the template).
   prometheusAddress: http://kube-prometheus-stack-prometheus.monitoring.svc:9090
 
 # Lab only: vLLM runs at most this many requests at the same time, so that a

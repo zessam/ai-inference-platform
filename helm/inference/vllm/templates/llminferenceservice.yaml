@@ -21,11 +21,10 @@ spec:
             serverAddress: {{ .Values.autoscaling.prometheusAddress }}
             query: 'sum({{ .Values.autoscaling.metric }}{namespace="{{ .Release.Namespace }}",model_name="{{ .Values.model.name }}"})'
             threshold: {{ .Values.autoscaling.threshold | quote }}
-      advanced:
-        horizontalPodAutoscalerConfig:
-          behavior:
-            scaleDown:
-              stabilizationWindowSeconds: {{ .Values.autoscaling.scaleDownStabilizationSeconds }}
+      # No keda.advanced.horizontalPodAutoscalerConfig: in KServe v0.21.0 the CRD
+      # rule for it reads .name without has(), so any horizontalPodAutoscalerConfig
+      # without a name fails validation ("no such key: name"). The HPA default
+      # scale-down stabilization window (300 seconds) applies instead.
 {{- else }}
   replicas: {{ .Values.replicas }}
 {{- end }}
