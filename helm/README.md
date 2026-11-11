@@ -5,19 +5,30 @@ This folder holds the Helm values for every app that Argo CD deploys. Each app h
 ## Layout
 
 ```
-helm/<stack>/<app>/values.yaml     values for a chart from a public chart repository
-helm/<stack>/<app>/Chart.yaml      only for a chart that this repository holds
-helm/<stack>/<app>/templates/      only for a chart that this repository holds
+helm/<stack>/[<group>/]<app>/values.yaml     values for a chart from a public chart repository
+helm/<stack>/[<group>/]<app>/Chart.yaml      only for a chart that this repository holds
+helm/<stack>/[<group>/]<app>/templates/      only for a chart that this repository holds
 ```
 
 The stack names are the same as the folder names in `argocd/apps/`: storage, monitoring, management and inference. The app folder has the same name as the Application file. For example, `argocd/apps/storage/seaweedfs.yaml` uses `helm/storage/seaweedfs/values.yaml`.
 
+A group folder holds apps that belong together. It has the same name in `argocd/apps/` and in `helm/`. For example, `argocd/apps/management/kserve/lws.yaml` uses `helm/management/kserve/lws/values.yaml`. A group also needs a group Application, for example `argocd/apps/management/kserve.yaml`, that syncs the folder. The stack Applications do not read subfolders.
+
 ## Current apps
 
-| Stack | App | Chart repository | Chart | Version | Node pool |
+| Stack/group | App | Chart repository | Chart | Version | Node pool |
 | --- | --- | --- | --- | --- | --- |
 | storage | seaweedfs | https://seaweedfs.github.io/seaweedfs/helm | seaweedfs | 4.53.0 | storage |
 | monitoring | kube-prometheus-stack | https://prometheus-community.github.io/helm-charts | kube-prometheus-stack | 93.1.2 | management |
+| management/kserve | cert-manager | https://charts.jetstack.io | cert-manager | v1.21.3 | management |
+| management/kserve | lws | registry.k8s.io/lws/charts (OCI) | lws | v0.8.0 | management |
+| management/kserve | envoy-gateway | docker.io/envoyproxy (OCI) | gateway-helm | v1.8.6 | management |
+| management/kserve | envoy-ai-gateway | docker.io/envoyproxy (OCI) | ai-gateway-helm | v1.1.0 | management |
+| management/kserve | kserve-llmisvc-resources | ghcr.io/kserve/charts (OCI) | kserve-llmisvc-resources | v0.21.0 | management |
+| management/kserve | kserve-runtime-configs | ghcr.io/kserve/charts (OCI) | kserve-runtime-configs | v0.21.0 | No pods |
+| management/kserve | kserve-gateway | This repository | helm/management/kserve/kserve-gateway | 0.1.0 | management |
+
+The CRD charts `envoy-ai-gateway-crds` and `kserve-llmisvc-crd` have no values file, so they have no folder here.
 
 `docs/PLAN.md` lists the apps that come next.
 
@@ -55,11 +66,11 @@ If you move or rename a values file, change the `valueFiles` path in the Applica
 
 You need Helm on your computer for steps 2 and 4. These steps do not change the cluster.
 
-1. Create the folder `helm/<stack>/<app>/`.
+1. Create the folder `helm/<stack>/<app>/`, or `helm/<stack>/<group>/<app>/` for an app in a group.
 2. Read the default values of the chart version that you will pin: `helm show values <chart> --repo <chart-repo-url> --version <version>`.
 3. Create `values.yaml` in the new folder with the values that you change.
 4. Render the chart on your computer to make sure that Helm accepts the values: `helm template <app> <chart> --repo <chart-repo-url> --version <version> --namespace <namespace> -f helm/<stack>/<app>/values.yaml`.
-5. Create `argocd/apps/<stack>/<app>.yaml`. Copy `argocd/apps/storage/seaweedfs.yaml`, then change the chart, version, release name, namespace and values path.
+5. Create `argocd/apps/<stack>/<app>.yaml`, or `argocd/apps/<stack>/<group>/<app>.yaml` for an app in a group. Copy `argocd/apps/storage/seaweedfs.yaml`, then change the chart, version, release name, namespace and values path.
 6. Commit and push the two new files.
 7. Make sure that Argo CD created the app and that it is Synced and Healthy: `kubectl -n argocd get application <app>`.
 
@@ -76,4 +87,4 @@ If the chart is in this repository, the Application needs only one source. Set `
     path: helm/inference/vllm
 ```
 
-The vLLM chart in `helm/inference/vllm` is planned. `docs/PLAN.md` gives its settings.
+`helm/management/kserve/kserve-gateway` is an example. The vLLM chart in `helm/inference/vllm` is planned. `docs/PLAN.md` gives its settings.

@@ -1,0 +1,5 @@
+apiVersion: v2
+name: kserve-gateway
+description: Envoy Gateway resources for the KServe ingress gateway
+type: application
+version: 0.1.0

@@ -1,17 +1,18 @@
 # Argo CD platform plan
 
-This file lists the Argo CD Applications for each stack. A stack is a group of apps that Argo CD syncs together. All four stack Applications exist. The storage and monitoring stacks have apps now. The folders of the other stacks contain only a `.gitkeep` file.
+This file lists the Argo CD Applications for each stack. A stack is a group of apps that Argo CD syncs together. All four stack Applications exist. The storage, monitoring and management stacks have apps now. The inference folder contains only a `.gitkeep` file.
 
 ## Layout
 
-The root Application syncs one Application for each stack. Each stack Application syncs the Application files in its own folder. The Helm values for each app are in `helm/`. `helm/README.md` tells you how to add an app.
+The root Application syncs one Application for each stack. Each stack Application syncs the Application files in its own folder, not in subfolders. A group folder, such as `management/kserve`, holds apps that belong together. A group Application next to the folder, for example `argocd/apps/management/kserve.yaml`, syncs the folder. The Argo CD UI then shows the apps of the group under one app. The Helm values for each app are in `helm/`. `helm/README.md` tells you how to add an app.
 
 ```
 argocd/root.yaml                    root app, path argocd/stacks
 argocd/stacks/<stack>.yaml          stack app, path argocd/apps/<stack>
-argocd/apps/<stack>/<app>.yaml      one Helm chart per file
-helm/<stack>/<app>/values.yaml      Helm values, read through the $values ref
-helm/<stack>/<app>/Chart.yaml       only for charts kept in this repository (vllm)
+argocd/apps/<stack>/<group>.yaml              group app, path argocd/apps/<stack>/<group>
+argocd/apps/<stack>/[<group>/]<app>.yaml      one Helm chart per file
+helm/<stack>/[<group>/]<app>/values.yaml      Helm values, read through the $values ref
+helm/<stack>/[<group>/]<app>/Chart.yaml       only for charts kept in this repository
 ```
 
 ## Sync waves
@@ -22,19 +23,21 @@ A sync wave is a number on an Application. Argo CD syncs lower numbers first. Th
 | --- | --- | --- |
 | storage | 0 | Created: seaweedfs |
 | monitoring | 0 | Created: kube-prometheus-stack |
-| management | 1 | Planned |
+| management | 1 | Created: cert-manager, LeaderWorkerSet, Envoy Gateway, Envoy AI Gateway, KServe LLMInferenceService |
 | inference | 2 | Planned |
 
-The sync wave of an app applies only inside its stack. For example, kserve-resources has wave 2 in the management stack. It starts after the other management apps, not at the same time as the inference stack.
+The sync wave of an app applies only inside its stack. For example, kserve-llmisvc-resources has wave 2 in the management stack. It starts after the other management apps, not at the same time as the inference stack.
 
 ## Rules for every app
 
 - Pin the chart version. Do not use `latest` or a version range.
-- Put the Helm values in `helm/<stack>/<app>/values.yaml`.
-- For a chart from a chart repository, use two sources: the chart, and this repository with `ref: values`. For a chart in this repository, use one source with `path`.
+- Put the Helm values in `helm/<stack>/<app>/values.yaml`. If the Application is in a group folder, use the same group folder: `helm/<stack>/<group>/<app>/values.yaml`.
+- For a chart from a chart repository with a values file, use two sources: the chart, and this repository with `ref: values`. A chart without a values file, for example a CRD chart, uses one source. For a chart in this repository, use one source with `path`.
+- For a Helm chart in an OCI registry, set `repoURL` without the `oci://` prefix. The registry needs a repository Secret with `enableOCI: "true"` in `argocd/apps/management/kserve/repositories.yaml`.
 - Set `syncPolicy.automated` with `prune: true` and `selfHeal: true`.
 - Set `retry` with limit 10, backoff 30s, factor 2, max 5m.
 - Set `syncOptions` to `CreateNamespace=true` and `ServerSideApply=true`.
+- If the chart has admission webhooks or CRD conversion webhooks, add `ignoreDifferences` for their `caBundle` and the sync option `RespectIgnoreDifferences=true`. cert-manager writes the `caBundle` after the sync. Without this, Argo CD reports drift and self-heal removes the value.
 
 Node placement:
 
@@ -76,59 +79,61 @@ The Grafana chart generates a random admin password with Helm `lookup`. Argo CD 
 
 Later: Langfuse on node port 30300.
 
-## Management stack (planned)
+## Management stack (created)
+
+The management stack installs KServe for LLMInferenceService and everything that it needs. All these apps are in the group `kserve`: the Applications in `argocd/apps/management/kserve/` and the values in `helm/management/kserve/`. The group Application `argocd/apps/management/kserve.yaml` syncs them. The sync waves in the table apply inside that group. It does not install the KServe InferenceService controller (`kserve-crd` and `kserve-resources`). The versions come from `kserve-deps.env` in KServe v0.21.0, except Envoy Gateway, which uses the newest v1.8 patch release.
 
 | App | Chart repository | Chart | Version | Namespace | Sync wave | Key values |
 | --- | --- | --- | --- | --- | --- | --- |
+| repositories | Not a chart | Secrets | Not applicable | argocd | -1 | OCI repository Secrets for docker.io/envoyproxy, ghcr.io/kserve/charts, registry.k8s.io/lws/charts |
 | cert-manager | https://charts.jetstack.io | cert-manager | v1.21.3 | cert-manager | 0 | `crds.enabled: true` |
-| keda | https://kedacore.github.io/charts | keda | 2.21.0 | keda | 1 | Defaults, nodeSelector pool=management |
-| kserve-crd | oci://ghcr.io/kserve/charts | kserve-crd | v0.21.0 | kserve | 1 | Defaults |
-| kserve-resources | oci://ghcr.io/kserve/charts | kserve-resources | v0.21.0 | kserve | 2 | See the list below |
+| lws | registry.k8s.io/lws/charts | lws | v0.8.0 | lws-system | 1 | `enableCertManager: true` |
+| envoy-gateway | docker.io/envoyproxy | gateway-helm | v1.8.6 | envoy-gateway-system | 1 | Extension manager for Envoy AI Gateway, InferencePool backends |
+| envoy-ai-gateway-crds | docker.io/envoyproxy | ai-gateway-crds-helm | v1.1.0 | envoy-ai-gateway-system | 1 | No values |
+| kserve-llmisvc-crd | ghcr.io/kserve/charts | kserve-llmisvc-crd | v0.21.0 | kserve | 1 | No values |
+| envoy-ai-gateway | docker.io/envoyproxy | ai-gateway-helm | v1.1.0 | envoy-ai-gateway-system | 2 | Webhook certificate from cert-manager |
+| kserve-llmisvc-resources | ghcr.io/kserve/charts | kserve-llmisvc-resources | v0.21.0 | kserve | 2 | S3 endpoint `seaweedfs-all-in-one.storage.svc:8333`, HTTP |
+| kserve-runtime-configs | ghcr.io/kserve/charts | kserve-runtime-configs | v0.21.0 | kserve | 3 | `llmisvcConfigs.enabled: true`, `servingruntime.enabled: false` |
+| kserve-gateway | This repository | helm/management/kserve/kserve-gateway | 0.1.0 | kserve | 3 | GatewayClass `envoy`, Gateway `kserve/kserve-ingress-gateway`, NodePort 30081 |
 
-cert-manager has wave 0 because KServe uses it for the certificates of its webhook. kserve-crd has wave 1 so that the CRDs exist before kserve-resources syncs in wave 2.
+All pods of these apps run on `pool: management`.
 
-Values for kserve-resources:
+The waves follow the dependencies:
 
-- `kserve.controller.deploymentMode: Standard`
-- `kserve.controller.gateway.disableIngressCreation: true`
-- `kserve.storage.s3.endpoint: seaweedfs-all-in-one.storage.svc:8333`
-- `kserve.storage.s3.useHttps: "0"`
+- cert-manager comes first, because LeaderWorkerSet, Envoy AI Gateway and KServe get their webhook certificates from it.
+- The CRD charts and Envoy Gateway come in wave 1. The Envoy Gateway chart also installs the Gateway API v1.5.1 CRDs, so Gateway API has no Application of its own.
+- The controllers come in wave 2. `kserve-llmisvc-resources` also installs the InferencePool and llm-d CRDs (`inferencepools.inference.networking.k8s.io`, `inferenceobjectives.llm-d.ai` and two others).
+- The LLMInferenceServiceConfig presets and the Gateway come in wave 3. The presets need the KServe webhook to be ready.
 
-The KServe charts come from an OCI registry. Argo CD needs a repository Secret for that registry before it can sync them:
+Envoy AI Gateway runs as an extension server of Envoy Gateway. It lets an HTTPRoute send traffic to an InferencePool, which is how llm-d routes each request to the best vLLM replica.
 
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: repo-kserve-oci
-  namespace: argocd
-  labels:
-    argocd.argoproj.io/secret-type: repository
-stringData:
-  type: helm
-  name: kserve
-  url: ghcr.io/kserve/charts
-  enableOCI: "true"
-```
+The local chart `helm/management/kserve/kserve-gateway` creates three resources:
 
-In the Application, the OCI source uses `repoURL: ghcr.io/kserve/charts` without the `oci://` prefix.
+- An EnvoyProxy in `envoy-gateway-system`. It runs the Envoy proxy pods on the management node and exposes the gateway on NodePort 30081. kind maps host port 8081 to that port.
+- The GatewayClass `envoy`, which uses that EnvoyProxy.
+- The Gateway `kserve/kserve-ingress-gateway`. LLMInferenceService uses this Gateway by default.
 
-Later: Envoy Gateway, llm-d, Guardrails AI on node port 30082, Portkey on node port 30080.
+The presets in `kserve-runtime-configs` use the image `ghcr.io/llm-d/llm-d-cuda`, which needs a GPU. For the CPU lab, the LLMInferenceService must set a CPU image. The presets already refer to `docker.io/vllm/vllm-openai-cpu:v0.23.0`.
+
+Later: KEDA 2.21.0 for autoscaling, Guardrails AI on node port 30082, Portkey on node port 30080.
 
 ## Inference stack (planned)
 
 | App | Chart repository | Chart | Version | Namespace | Sync wave | Key values |
 | --- | --- | --- | --- | --- | --- | --- |
-| vllm | This repository | helm/inference/vllm | Pinned in Chart.yaml | inference | Stack wave 2 | KServe InferenceService, see the list below |
+| vllm | This repository | helm/inference/vllm | Pinned in Chart.yaml | inference | Stack wave 2 | KServe LLMInferenceService, see the list below |
 
-The chart `helm/inference/vllm` does not exist yet. It will render a KServe InferenceService with these settings:
+The chart `helm/inference/vllm` does not exist yet. It will render a KServe LLMInferenceService with these settings:
 
-- Deployment mode Standard, with the annotation `serving.kserve.io/deploymentMode: Standard`.
+- The router uses the Gateway `kserve/kserve-ingress-gateway` and an llm-d scheduler (endpoint picker) for an InferencePool.
+- For the CPU lab, the vLLM CPU image `docker.io/vllm/vllm-openai-cpu`, with a pinned tag.
 - Autoscaler class `keda` on the metric `sum(vllm:num_requests_waiting)` from Prometheus. Minimum 1 replica, maximum 2 replicas.
 - Pod anti-affinity on `kubernetes.io/hostname`, so that the two replicas run on worker2 and worker3.
 - `nodeSelector: pool: inference` and a toleration for `workload=inference:NoSchedule`.
-- `storageUri: s3://models/smollm2-135m-instruct`.
-- `serviceAccountName: kserve-s3`.
+- Model URI `s3://models/smollm2-135m-instruct`.
+- Service account `kserve-s3`.
+
+The exact LLMInferenceService fields for these settings must be checked against KServe v0.21.0 before the chart is written.
 
 The ServiceAccount `inference/kserve-s3` refers to the Secret `inference/s3-models`. That Secret holds the read keys from `.lab-secrets.json` and these KServe annotations:
 

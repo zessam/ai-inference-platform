@@ -1,0 +1,56 @@
+# KServe LLMInferenceService controller. Also installs the InferencePool and
+# llm-d CRDs (kserve.llmisvc.createGIECRDs) and the inferenceservice-config
+# ConfigMap.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kserve-llmisvc-resources
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  sources:
+    - repoURL: ghcr.io/kserve/charts
+      chart: kserve-llmisvc-resources
+      targetRevision: v0.21.0
+      helm:
+        releaseName: kserve-llmisvc-resources
+        valueFiles:
+          - $values/helm/management/kserve/kserve-llmisvc-resources/values.yaml
+    - repoURL: https://github.com/zessam/ai-inference-platform.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: kserve
+  # cert-manager (or the controller itself) writes the CA bundle into webhook
+  # configurations and CRD conversion webhooks after sync. Ignore that field so
+  # Argo CD does not report drift or remove it.
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[]?.clientConfig.caBundle
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[]?.clientConfig.caBundle
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jqPathExpressions:
+        - .spec.conversion.webhook.clientConfig.caBundle
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true

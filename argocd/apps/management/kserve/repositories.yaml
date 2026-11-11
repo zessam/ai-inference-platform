@@ -1,0 +1,47 @@
+# Argo CD repository Secrets for Helm charts in OCI registries. Argo CD needs
+# enableOCI "true" to pull these charts. No credentials: all are public.
+# Sync wave -1 so they exist before the Applications that use them.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: repo-envoyproxy-oci
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+stringData:
+  type: helm
+  name: envoyproxy
+  url: docker.io/envoyproxy
+  enableOCI: "true"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: repo-kserve-oci
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+stringData:
+  type: helm
+  name: kserve
+  url: ghcr.io/kserve/charts
+  enableOCI: "true"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: repo-lws-oci
+  namespace: argocd
+  labels:
+    argocd.argoproj.io/secret-type: repository
+  annotations:
+    argocd.argoproj.io/sync-wave: "-1"
+stringData:
+  type: helm
+  name: lws
+  url: registry.k8s.io/lws/charts
+  enableOCI: "true"

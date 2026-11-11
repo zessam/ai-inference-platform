@@ -1,0 +1,10 @@
+# Values for the cert-manager Helm chart v1.21.3
+# (argocd/apps/management/kserve/cert-manager.yaml).
+
+crds:
+  enabled: true
+
+global:
+  # Applies to the controller, webhook, cainjector and startupapicheck pods.
+  nodeSelector:
+    pool: management

@@ -1,0 +1,55 @@
+# Envoy AI Gateway controller. Envoy Gateway calls it as an extension server,
+# which adds InferencePool backends (llm-d routing) to Envoy.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: envoy-ai-gateway
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "2"
+spec:
+  project: default
+  sources:
+    - repoURL: docker.io/envoyproxy
+      chart: ai-gateway-helm
+      targetRevision: v1.1.0
+      helm:
+        releaseName: envoy-ai-gateway
+        valueFiles:
+          - $values/helm/management/kserve/envoy-ai-gateway/values.yaml
+    - repoURL: https://github.com/zessam/ai-inference-platform.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: envoy-ai-gateway-system
+  # cert-manager (or the controller itself) writes the CA bundle into webhook
+  # configurations and CRD conversion webhooks after sync. Ignore that field so
+  # Argo CD does not report drift or remove it.
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[]?.clientConfig.caBundle
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[]?.clientConfig.caBundle
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jqPathExpressions:
+        - .spec.conversion.webhook.clientConfig.caBundle
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true

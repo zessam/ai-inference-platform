@@ -1,0 +1,26 @@
+# Configuration for the Envoy proxy pods that serve the Gateway: run them on
+# the management node and expose listener port 80 on a fixed NodePort.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata:
+  name: {{ .Values.envoyProxy.name }}
+  namespace: {{ .Values.envoyProxy.namespace }}
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyDeployment:
+        pod:
+          nodeSelector:
+            {{- toYaml .Values.envoyProxy.nodeSelector | nindent 12 }}
+      envoyService:
+        type: NodePort
+        # Envoy Gateway names the Service port <protocol>-<port>.
+        patch:
+          type: StrategicMerge
+          value:
+            spec:
+              ports:
+                - name: http-80
+                  port: 80
+                  nodePort: {{ .Values.envoyProxy.nodePort }}

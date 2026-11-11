@@ -1,0 +1,10 @@
+# Values for the kserve-runtime-configs Helm chart v0.21.0
+# (argocd/apps/management/kserve/kserve-runtime-configs.yaml).
+# Install only the LLMInferenceServiceConfig presets, not the
+# ClusterServingRuntimes for InferenceService.
+
+kserve:
+  llmisvcConfigs:
+    enabled: true
+  servingruntime:
+    enabled: false

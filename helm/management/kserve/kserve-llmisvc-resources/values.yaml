@@ -1,0 +1,16 @@
+# Values for the kserve-llmisvc-resources Helm chart v0.21.0
+# (argocd/apps/management/kserve/kserve-llmisvc-resources.yaml).
+
+kserve:
+  llmisvc:
+    controller:
+      nodeSelector:
+        pool: management
+  # Default S3 configuration for model downloads (SeaweedFS in the storage
+  # stack). The keys come from a Secret in the model namespace.
+  storage:
+    s3:
+      endpoint: seaweedfs-all-in-one.storage.svc:8333
+      useHttps: "0"
+      verifySSL: "0"
+      region: us-east-1

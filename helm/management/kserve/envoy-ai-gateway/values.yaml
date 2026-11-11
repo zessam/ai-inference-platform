@@ -1,0 +1,12 @@
+# Values for the Envoy AI Gateway Helm chart v1.1.0
+# (argocd/apps/management/kserve/envoy-ai-gateway.yaml).
+
+controller:
+  nodeSelector:
+    pool: management
+  mutatingWebhook:
+    # Without cert-manager the chart generates the webhook certificate with Helm
+    # lookup. Argo CD can't run lookup, so the certificate would change on every
+    # sync.
+    certManager:
+      enable: true

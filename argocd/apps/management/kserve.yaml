@@ -1,0 +1,25 @@
+# Group Application "kserve". Syncs the Applications in
+# argocd/apps/management/kserve, so the Argo CD UI shows them under one app.
+# Their sync waves (-1 to 3) apply inside this group. The Application health
+# check in patches/argocd-app-health.yaml makes this app Healthy only when all
+# of them are Healthy.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: kserve
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/zessam/ai-inference-platform.git
+    targetRevision: main
+    path: argocd/apps/management/kserve
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true

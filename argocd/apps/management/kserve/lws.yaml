@@ -1,0 +1,55 @@
+# LeaderWorkerSet. KServe uses it when one model runs across several nodes
+# (multi-node vLLM).
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: lws
+  namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  project: default
+  sources:
+    - repoURL: registry.k8s.io/lws/charts
+      chart: lws
+      targetRevision: v0.8.0
+      helm:
+        releaseName: lws
+        valueFiles:
+          - $values/helm/management/kserve/lws/values.yaml
+    - repoURL: https://github.com/zessam/ai-inference-platform.git
+      targetRevision: main
+      ref: values
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: lws-system
+  # cert-manager (or the controller itself) writes the CA bundle into webhook
+  # configurations and CRD conversion webhooks after sync. Ignore that field so
+  # Argo CD does not report drift or remove it.
+  ignoreDifferences:
+    - group: admissionregistration.k8s.io
+      kind: MutatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[]?.clientConfig.caBundle
+    - group: admissionregistration.k8s.io
+      kind: ValidatingWebhookConfiguration
+      jqPathExpressions:
+        - .webhooks[]?.clientConfig.caBundle
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+      jqPathExpressions:
+        - .spec.conversion.webhook.clientConfig.caBundle
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    retry:
+      limit: 10
+      backoff:
+        duration: 30s
+        factor: 2
+        maxDuration: 5m
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+      - RespectIgnoreDifferences=true

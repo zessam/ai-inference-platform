@@ -1,0 +1,19 @@
+# Values for the local kserve-gateway chart
+# (argocd/apps/management/kserve/kserve-gateway.yaml).
+
+# LLMInferenceService uses kserve/kserve-ingress-gateway by default
+# (inferenceservice-config, ingress.kserveIngressGateway).
+gateway:
+  name: kserve-ingress-gateway
+  namespace: kserve
+
+gatewayClass:
+  name: envoy
+
+envoyProxy:
+  name: kserve-ingress
+  namespace: envoy-gateway-system
+  # kind maps host 127.0.0.1:8081 to this port (cluster/kind-config.yaml).
+  nodePort: 30081
+  nodeSelector:
+    pool: management

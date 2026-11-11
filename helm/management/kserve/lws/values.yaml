@@ -1,0 +1,8 @@
+# Values for the LeaderWorkerSet Helm chart v0.8.0
+# (argocd/apps/management/kserve/lws.yaml).
+
+# Use cert-manager for the webhook certificate instead of the built-in rotator.
+enableCertManager: true
+
+nodeSelector:
+  pool: management
